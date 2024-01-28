@@ -34,6 +34,7 @@ import com.github.catvod.net.OkHttp;
 import com.github.catvod.net.OkResult;
 import com.github.catvod.spider.Init;
 import com.github.catvod.spider.Proxy;
+import com.github.catvod.utils.Json;
 import com.github.catvod.utils.Notify;
 import com.github.catvod.utils.Path;
 import com.github.catvod.utils.ProxyVideo;
@@ -41,7 +42,6 @@ import com.github.catvod.utils.QRCode;
 import com.github.catvod.utils.ResUtil;
 import com.github.catvod.utils.Util;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -106,6 +106,13 @@ public class AliYun {
         return headers;
     }
 
+    private HashMap<String, String> getHeaders() {
+        HashMap<String, String> headers = getHeader();
+        headers.put("x-share-token", share.getShareToken());
+        headers.put("X-Canary", "client=Android,app=adrive,version=v4.3.1");
+        return headers;
+    }
+
     private HashMap<String, String> getHeaderAuth() {
         HashMap<String, String> headers = getHeader();
         headers.put("x-share-token", share.getShareToken());
@@ -138,7 +145,12 @@ public class AliYun {
 
     private String auth(String url, String json, boolean retry) {
         url = url.startsWith("https") ? url : "https://api.aliyundrive.com/" + url;
-        OkResult result = OkHttp.post(url, json, getHeaderAuth());
+        OkResult result;
+        if (url.contains("file/list")) {
+            result = OkHttp.post(url, json, getHeaders());
+        } else {
+            result = OkHttp.post(url, json, getHeaderAuth());
+        }
         SpiderDebug.log(result.getCode() + "," + url + "," + result.getBody());
         if (retry && result.getCode() == 401 && refreshAccessToken()) return auth(url, json, false);
         if (retry && result.getCode() == 429) return auth(url, json, false);
@@ -336,7 +348,7 @@ public class AliYun {
             param.addProperty("share_id", shareId);
             param.addProperty("expire_sec", 600);
             String json = auth("v2/file/get_share_link_download_url", param.toString(), false);
-            String url = JsonParser.parseString(json).getAsJsonObject().get("download_url").getAsString();
+            String url = Json.parse(json).getAsJsonObject().get("download_url").getAsString();
             shareDownloadMap.put(fileId, url);
             return url;
         } catch (Exception e) {
